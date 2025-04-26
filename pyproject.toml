@@ -1,0 +1,28 @@
+[project]
+name = "quantari"
+version = "0.1.0"
+description = "Quantari is a python application Algorithmic Trading System."
+authors = [
+  {name = "Ariel Berardi", email = "ariel.berardi95@gmail.com"},
+]
+readme = {file = "README.md", content-type = "text/markdown"}
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.12"
+dependencies = [
+  "psycopg[binary] (>=3.2.6,<4.0.0)",
+  "kafka-python (>=2.1.5,<3.0.0)",
+  "python-kraken-sdk (>=3.2.2,<4.0.0)",
+  "python-dotenv (>=1.1.0,<2.0.0)"
+]
+
+[project.urls]
+Repository = "https://github.com/arielberardi/quantari"
+Issues = "https://github.com/arielberardi/quantari/issues"
+Changelog = "https://github.com/arielberardi/quantari/blob/master/CHANGELOG.md"
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.2.0"
+ruff = "^0.11.7"
+pytest = "^8.3.5"
+pytest-mock = "^3.14.0"
