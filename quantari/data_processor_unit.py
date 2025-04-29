@@ -62,25 +62,24 @@ class DataProcessorUnit:
             }
         )
 
-        try:
-            while not self.kraken_client.exception_occur:
-                await asyncio.sleep(10)
-        except (KeyboardInterrupt, asyncio.CancelledError):
-            logging.info("Shutdown signal received, cleaning up...")
-        finally:
-            await self.exit_gracefully()
+        while not self.kraken_client.exception_occur:
+            await asyncio.sleep(10)
 
 
 # We use main function so we can shutdown the process gracefully
 async def main():
+    shutdown_event = asyncio.Event()
+    for sig in [signal.SIGINT, signal.SIGTERM, signal.SIGQUIT, signal.SIGHUP]:
+        signal.signal(sig, lambda s, f: shutdown_event.set())
+
     dpu = DataProcessorUnit()
     task = asyncio.create_task(dpu.run())
 
-    for sig in [signal.SIGINT, signal.SIGTERM, signal.SIGQUIT, signal.SIGHUP]:
-        signal.signal(sig, lambda s, f: task.cancel())
-
-    while task.done() is False:
+    while not shutdown_event.is_set():
         await asyncio.sleep(1)
+
+    task.cancel()
+    await dpu.exit_gracefully()
 
 
 if __name__ == "__main__":
