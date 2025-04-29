@@ -40,14 +40,12 @@ class TimescaleClient:
             )
             self.cursor.execute("SELECT create_hypertable('market_ochl', 'timestamp');")
 
-    # TODO: We need to understand if timescale can automatically handle duplicates
-    # and aggregate the data
     def save_market_data(self, data: dict) -> None:
-        if not self.fetch_market_data(data["timestamp"]):
-            logging.debug("Inserting new data into database")
+        if not self.fetch_market_data(data["interval_begin"]):
+            logging.info(f"Inserting new data into database: {data}")
             self.insert_market_data(data)
         else:
-            logging.debug("Updating existing data in database")
+            logging.info(f"Updating existing data in database {data}")
             self.update_market_data(data)
         self.client.commit()
 
@@ -58,7 +56,7 @@ class TimescaleClient:
         self.cursor.execute(
             "INSERT INTO market_ochl (timestamp, open, high, low, close, volume, symbol) VALUES (%s, %s, %s, %s, %s, %s, %s);",
             (
-                data["timestamp"],
+                data["interval_begin"],
                 data["open"],
                 data["high"],
                 data["low"],
@@ -81,7 +79,7 @@ class TimescaleClient:
                 data["close"],
                 data["volume"],
                 data["symbol"],
-                data["timestamp"],
+                data["interval_begin"],
             ),
         )
 

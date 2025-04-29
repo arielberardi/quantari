@@ -24,9 +24,11 @@ class KafkaClient:
             self.producer.close(timeout=10)
 
     def publish_market_data(self, market_data: dict) -> None:
+        logging.info(f"Sending data to Kafka: {market_data}")
+
         value = {
             "symbol": market_data["symbol"],
-            "timestamp": market_data["timestamp"],
+            "timestamp": market_data["interval_begin"],
             "open": market_data["open"],
             "high": market_data["high"],
             "low": market_data["low"],
