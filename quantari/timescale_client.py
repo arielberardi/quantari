@@ -18,16 +18,16 @@ class TimescaleClient:
         self.cursor = None
 
     def __del__(self) -> None:
-        if self.client and not self.client.closed:
-            self.close_connection()
+        self.close_connection()
 
     def connect(self) -> None:
         self.client = psycopg.connect(" ".join(self.DB_SETTINGS))
         self.cursor = self.client.cursor()
 
     def close_connection(self) -> None:
-        self.cursor.close()
-        self.client.close()
+        if self.client and not self.client.closed:
+            self.cursor.close()
+            self.client.close()
 
     def create_market_table(self) -> None:
         """
@@ -75,15 +75,15 @@ class TimescaleClient:
         Update market data in the database.
         """
         self.cursor.execute(
-            "UPDATE market_ochl SET open = %s, high = %s, low = %s, close = %s, volume = %s, symbol = %s WHERE timestamp = %s;",
+            "UPDATE market_ochl SET open = %s, high = %s, low = %s, close = %s, volume = %s WHERE timestamp = %s AND symbol = %s;",
             (
                 data["open"],
                 data["high"],
                 data["low"],
                 data["close"],
                 data["volume"],
-                data["symbol"],
                 data["interval_begin"],
+                data["symbol"],
             ),
         )
 
