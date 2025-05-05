@@ -5,6 +5,9 @@ from kafka import KafkaProducer
 
 
 class KafkaClient:
+    def __init__(self) -> None:
+        self.producer = None
+
     def __del__(self) -> None:
         self.close_producer()
 

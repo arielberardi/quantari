@@ -65,7 +65,7 @@ class DataProcessorUnit:
         )
 
         while not self.kraken_client.exception_occur:
-            await asyncio.sleep(10)
+            await asyncio.sleep(5)
 
 
 # We use main function so we can shutdown the process gracefully
