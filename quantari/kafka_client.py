@@ -26,6 +26,8 @@ class KafkaClient:
         if self.producer:
             self.producer.close(timeout=10)
 
+    # TODO: Make market data its own object so we don't have to
+    # serialize it to a string or change interval_begin to timestamp
     def publish_market_data(self, market_data: dict) -> None:
         logging.info(f"Sending data to Kafka: {market_data}")
 
