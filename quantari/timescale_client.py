@@ -14,12 +14,16 @@ class TimescaleClient:
     ]
 
     def __init__(self):
-        self.client = psycopg.connect(" ".join(self.DB_SETTINGS))
-        self.cursor = self.client.cursor()
+        self.client = None
+        self.cursor = None
 
     def __del__(self) -> None:
-        if not self.client.closed:
+        if self.client and not self.client.closed:
             self.close_connection()
+
+    def connect(self) -> None:
+        self.client = psycopg.connect(" ".join(self.DB_SETTINGS))
+        self.cursor = self.client.cursor()
 
     def close_connection(self) -> None:
         self.cursor.close()

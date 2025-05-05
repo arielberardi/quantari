@@ -43,6 +43,7 @@ class DataProcessorUnit:
 
     async def run(self) -> None:
         logging.info("Setting up database connection")
+        self.db_client.connect()
         self.db_client.create_market_table()
 
         logging.info("Setting up Kafka producer")
