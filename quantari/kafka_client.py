@@ -38,8 +38,11 @@ class KafkaClient:
             value_deserializer=lambda m: json.loads(m.decode("utf-8")),
         )
 
-    def subscribe_market_data(self, topic) -> None:
-        self.consumer.subscribe([topic])
+    def subscribe_market_data(self) -> None:
+        self.consumer.subscribe(["market_data"])
+
+    def subscribe_market_indicators(self) -> None:
+        self.consumer.subscribe(["market_indicators"])
 
     def close_consumer(self) -> None:
         if self.consumer:
@@ -61,7 +64,7 @@ class KafkaClient:
         self.producer.send("market_data", value)
         self.producer.flush()
 
-    def pull_market_data(self) -> dict | None:
+    def pull_data(self, topic_name) -> dict | None:
         package = self.consumer.poll(timeout_ms=1000)
         if len(package) == 0:
             return None
@@ -69,7 +72,15 @@ class KafkaClient:
         logging.debug(f"Received data from Kafka: {package}")
 
         for topic, records in package.items():
+            if topic != topic_name:
+                continue
             for message in records:
                 return message.value
 
         return None
+
+    def pull_market_data(self):
+        return self.pull_data("market_data")
+
+    def pull_market_indicators(self):
+        return self.pull_data("market_indicators")

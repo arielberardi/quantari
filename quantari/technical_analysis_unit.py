@@ -27,7 +27,7 @@ class TechnicalAnalysisUnit:
 
         logging.info("Setup Kafka Consumer")
         self.kafka_consumer.create_consumer()
-        self.kafka_consumer.subscribe_market_data("market_data")
+        self.kafka_consumer.subscribe_market_data()
 
         while not self.exception and not shutdown_event.is_set():
             message = self.kafka_consumer.pull_market_data()
