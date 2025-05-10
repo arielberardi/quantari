@@ -6,6 +6,7 @@ from datetime import datetime
 
 from kraken.spot import SpotWSClient
 
+from quantari.decorators import catch_and_set_exception
 from quantari.kafka_client import KafkaClient
 from quantari.timescale_client import TimescaleClient
 
@@ -16,6 +17,7 @@ class DataProcessorUnit:
         self.kafka_producer = KafkaClient()
         self.kraken_client = None
         self.last_candle_data = None
+        self.exception = False
 
     async def close(self) -> None:
         if self.kraken_client:
@@ -23,25 +25,8 @@ class DataProcessorUnit:
         self.kafka_producer.close_producer()
         self.db_client.close_connection()
 
-    def process_market_data(self, data: dict) -> None:
-        # TODO: Convert data into its own class to avoid converting and mutability issues
-
-        # We cached the last data and only trigger DB/Kafka event on closure of the candle
-        if self.last_candle_data and datetime.fromisoformat(
-            self.last_candle_data["interval_begin"]
-        ) < datetime.fromisoformat(data["interval_begin"]):
-            self.kafka_producer.publish_market_data(self.last_candle_data)
-            self.db_client.save_market_data(self.last_candle_data)
-
-        self.last_candle_data = data
-
-    async def on_message(self, message: dict) -> None:
-        logging.info(f"Market Data => {message}")
-        if message.get("channel") == "ohlc" and message.get("data"):
-            for data in message["data"]:
-                self.process_market_data(data)
-
-    async def run(self) -> None:
+    @catch_and_set_exception
+    async def run(self, shutdown_event) -> None:
         logging.info("Setting up database connection")
         self.db_client.connect()
         self.db_client.create_market_table()
@@ -65,23 +50,43 @@ class DataProcessorUnit:
             }
         )
 
-        while not self.kraken_client.exception_occur:
-            await asyncio.sleep(5)
+        while (
+            not self.kraken_client.exception_occur
+            and not self.exception
+            and not shutdown_event.is_set()
+        ):
+            await asyncio.sleep(1)
+
+    def process_market_data(self, data: dict) -> None:
+        # We cached the last data and only trigger DB/Kafka event on closure of the candle
+        if self.last_candle_data and datetime.fromisoformat(
+            self.last_candle_data["interval_begin"]
+        ) < datetime.fromisoformat(data["interval_begin"]):
+            self.kafka_producer.publish_market_data(self.last_candle_data)
+            self.db_client.save_market_data(self.last_candle_data)
+
+        self.last_candle_data = data
+
+    @catch_and_set_exception
+    async def on_message(self, message: dict) -> None:
+        logging.info(f"Market Data => {message}")
+        if message.get("channel") == "ohlc" and message.get("data"):
+            for data in message["data"]:
+                self.process_market_data(data)
 
 
-# We use main function so we can shutdown the process gracefully
 async def main():
     shutdown_event = asyncio.Event()
+
     for sig in [signal.SIGINT, signal.SIGTERM, signal.SIGQUIT, signal.SIGHUP]:
         signal.signal(sig, lambda s, f: shutdown_event.set())
 
+    logging.info("Starting process...")
     dpu = DataProcessorUnit()
-    task = asyncio.create_task(dpu.run())
 
-    while not shutdown_event.is_set():
-        await asyncio.sleep(1)
+    await dpu.run(shutdown_event)
 
-    task.cancel()
+    logging.info("Closing process...")
     await dpu.close()
 
 

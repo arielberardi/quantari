@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -41,7 +42,9 @@ class TestTimescaleClient:
         with patch("quantari.timescale_client.psycopg.connect") as mock_connect:
             timescale_client.connect()
 
-            mock_connect.assert_called_once_with(" ".join(timescale_client.DB_SETTINGS))
+            mock_connect.assert_called_once_with(
+                " ".join(timescale_client.DB_SETTINGS), autocommit=True
+            )
 
             assert timescale_client.client == mock_connect.return_value
             assert (
@@ -98,8 +101,8 @@ class TestTimescaleClient:
         timescale_client.insert_market_data(self.MOCK_CANDLE_DATA)
 
         timescale_client.cursor.execute.assert_called_once_with(
-            "INSERT INTO market_ochl (timestamp, open, high, low, close, volume, symbol) VALUES (%s, %s, %s, %s, %s, %s, %s);",
-            ("2023-01-01T00:00:00", 1, 2, 3, 4, 5, "BTCUSD"),
+            "INSERT INTO market_ochl (timestamp, open, high, low, close, volume, symbol, indicators) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);",
+            ("2023-01-01T00:00:00", 1, 2, 3, 4, 5, "BTCUSD", "{}"),
         )
 
     def test_save_market_data(self, timescale_client):
@@ -121,3 +124,18 @@ class TestTimescaleClient:
         timescale_client.update_market_data.assert_called_once_with(
             self.MOCK_CANDLE_DATA
         )
+
+    def test_update_indicators(self, timescale_client):
+        timestamp = "2023-01-01T00:00:00"
+        indicators = {"EMA": 1.0, "SMA": 2.0}
+
+        timescale_client.update_indicators(timestamp, indicators)
+
+        timescale_client.cursor.execute.assert_called_once_with(
+            "UPDATE market_ochl SET indicators = %s WHERE timestamp = %s;",
+            (json.dumps(indicators), timestamp),
+        )
+
+    def test_drop_table(self, timescale_client):
+        timescale_client.drop_table()
+        timescale_client.cursor.execute("DROP TABLE IF EXISTS market_ochl;")
