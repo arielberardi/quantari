@@ -23,6 +23,14 @@ class TestDataProcessorUnit:
 
         return dpu
 
+    @pytest.fixture
+    def mock_kraken_instance(self):
+        mock_kraken_instance = AsyncMock()
+        mock_kraken_instance.start = AsyncMock()
+        mock_kraken_instance.subscribe = AsyncMock()
+        mock_kraken_instance.exception_occur = False
+        return mock_kraken_instance
+
     @pytest.mark.asyncio
     async def test_close(
         self,
@@ -43,7 +51,7 @@ class TestDataProcessorUnit:
         data_processor_unit.kafka_producer.publish_market_data.assert_called_once()
         data_processor_unit.db_client.save_market_data.assert_called_once()
 
-        assert data_processor_unit.last_candle_data == new_data
+        assert data_processor_unit.last_candle_data is new_data
 
     def test_process_market_data_no_candle_closure(self, data_processor_unit):
         data_processor_unit.last_candle_data = {
@@ -58,7 +66,7 @@ class TestDataProcessorUnit:
         data_processor_unit.kafka_producer.publish_market_data.assert_not_called()
         data_processor_unit.db_client.save_market_data.assert_not_called()
 
-        assert data_processor_unit.last_candle_data == new_data
+        assert data_processor_unit.last_candle_data is new_data
 
     @pytest.mark.asyncio
     async def test_process_each_data_message(self, data_processor_unit):
@@ -79,16 +87,10 @@ class TestDataProcessorUnit:
 
     @patch("quantari.data_processor_unit.SpotWSClient")
     @pytest.mark.asyncio
-    async def test_run_setups_clients_and_loops_until_an_exception(
-        self,
-        mock_spot_ws_client,
-        data_processor_unit,
+    async def test_run_until_exception(
+        self, mock_spot_ws_client, data_processor_unit, mock_kraken_instance
     ):
         # Setup Mock for Kraken Websocket Client
-        mock_kraken_instance = AsyncMock()
-        mock_kraken_instance.start = AsyncMock()
-        mock_kraken_instance.subscribe = AsyncMock()
-        mock_kraken_instance.exception_occur = False
         mock_spot_ws_client.return_value = mock_kraken_instance
 
         # Simulate the exception occurring after a short delay
@@ -98,7 +100,8 @@ class TestDataProcessorUnit:
 
         asyncio.create_task(stop_after_delay())
 
-        await data_processor_unit.run()
+        shutdown_event = asyncio.Event()
+        await data_processor_unit.run(shutdown_event)
 
         # Setup Database Connection
         data_processor_unit.db_client.create_market_table.assert_called_once()
@@ -109,3 +112,5 @@ class TestDataProcessorUnit:
         # Start and subscribe to Kraken Websocket
         mock_kraken_instance.start.assert_awaited_once()
         mock_kraken_instance.subscribe.assert_awaited_once()
+
+        assert mock_kraken_instance.exception_occur is True
