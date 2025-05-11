@@ -32,3 +32,10 @@ def test_bearish_crossover():
     message = {"indicators": {"MACD_12_26_9": [4, 10]}}
     simpleMACD = SimpleMACD()
     assert simpleMACD.evaluate(message) is Signals.SELL
+
+
+def test_no_repeated_signal():
+    message = {"indicators": {"MACD_12_26_9": [4, 10]}}
+    simpleMACD = SimpleMACD()
+    assert simpleMACD.evaluate(message) is Signals.SELL
+    assert simpleMACD.evaluate(message) is Signals.HOLD
