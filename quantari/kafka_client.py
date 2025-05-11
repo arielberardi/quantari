@@ -11,7 +11,7 @@ class KafkaClient:
         self.consumer = None
 
     def __del__(self) -> None:
-        self.close_producer()
+        self.close()
 
     def create_producer(self) -> None:
         self.producer = KafkaProducer(
@@ -23,6 +23,10 @@ class KafkaClient:
             client_id="quantari-dpu-1",
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
         )
+
+    def close(self) -> None:
+        self.close_producer()
+        self.close_consumer()
 
     def close_producer(self) -> None:
         if self.producer:
@@ -44,6 +48,9 @@ class KafkaClient:
     def subscribe_market_indicators(self) -> None:
         self.consumer.subscribe(["market_indicators"])
 
+    def subscribe_signals(self) -> None:
+        self.consumer.subscribe(["signals"])
+
     def close_consumer(self) -> None:
         if self.consumer:
             self.consumer.close(timeout_ms=1000)
@@ -62,6 +69,28 @@ class KafkaClient:
         }
 
         self.producer.send("market_data", value)
+        self.producer.flush()
+
+    def publish_market_indicators(self, market_indicators: dict) -> None:
+        logging.debug(f"Sending data to Kafka: {market_indicators}")
+
+        value = {
+            "symbol": market_indicators["symbol"],
+            "timestamp": market_indicators["interval_begin"],
+            "open": market_indicators["open"],
+            "high": market_indicators["high"],
+            "low": market_indicators["low"],
+            "close": market_indicators["close"],
+            "volume": market_indicators["volume"],
+            "indicators": market_indicators["indicators"],
+        }
+
+        self.producer.send("market_indicators", value)
+        self.producer.flush()
+
+    def publish_signals(self, signals: dict) -> None:
+        logging.debug(f"Sending data to Kafka: {signals}")
+        self.producer.send("signals", signals)
         self.producer.flush()
 
     def pull_data(self, topic_name) -> dict | None:
@@ -84,3 +113,6 @@ class KafkaClient:
 
     def pull_market_indicators(self):
         return self.pull_data("market_indicators")
+
+    def pull_signals(self):
+        return self.pull_data("signals")

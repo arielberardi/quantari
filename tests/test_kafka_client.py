@@ -78,6 +78,10 @@ class TestKafkaClient:
         kafka_client.subscribe_market_indicators()
         kafka_client.consumer.subscribe.assert_called_once_with(["market_indicators"])
 
+    def test_subscribe_to_signals(self, kafka_client):
+        kafka_client.subscribe_signals()
+        kafka_client.consumer.subscribe.assert_called_once_with(["signals"])
+
     def test_close_consumer(self, kafka_client):
         kafka_client.close_consumer()
         kafka_client.consumer.close.assert_called_once()
@@ -103,3 +107,26 @@ class TestKafkaClient:
         }
         value = kafka_client.pull_data("topic_name")
         assert value is None
+
+    def test_publish_signals(self, kafka_client):
+        mock_signals = {"Signal1": "Hold", "Signal2": "Buy"}
+        kafka_client.publish_signals(mock_signals)
+
+        kafka_client.producer.send.assert_called_once_with(
+            "signals",
+            mock_signals,
+        )
+
+    def test_publish_market_indicators(self, kafka_client):
+        market_indicators = self.MOCK_CANDLE_DATA.copy()
+        market_indicators["indicators"] = "indicators"
+
+        kafka_client.publish_market_indicators(market_indicators)
+
+        market_indicators.pop("interval_begin")
+        market_indicators["timestamp"] = self.MOCK_CANDLE_DATA["interval_begin"]
+
+        kafka_client.producer.send.assert_called_once_with(
+            "market_indicators",
+            market_indicators,
+        )

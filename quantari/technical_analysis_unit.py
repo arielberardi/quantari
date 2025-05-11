@@ -10,13 +10,13 @@ from quantari.timescale_client import TimescaleClient
 
 class TechnicalAnalysisUnit:
     def __init__(self):
-        self.kafka_consumer = KafkaClient()
+        self.kafka_client = KafkaClient()
         self.db_client = TimescaleClient()
         self.indicators = [SMA(), EMA(), MACD()]
         self.exception = False
 
     def close(self) -> None:
-        self.kafka_consumer.close_consumer()
+        self.kafka_client.close()
         self.db_client.close_connection()
 
     @catch_and_set_exception
@@ -26,20 +26,31 @@ class TechnicalAnalysisUnit:
         self.db_client.create_market_table()
 
         logging.info("Setup Kafka Consumer")
-        self.kafka_consumer.create_consumer()
-        self.kafka_consumer.subscribe_market_data()
+        self.kafka_client.create_consumer()
+        self.kafka_client.create_producer()
+        self.kafka_client.subscribe_market_data()
 
         while not self.exception and not shutdown_event.is_set():
-            message = self.kafka_consumer.pull_market_data()
+            message = self.kafka_client.pull_market_data()
             if message:
                 logging.info(f"Market Data => {message}")
-                self.calculate_indicators(message)
+                indicators_values = self.calculate_indicators(message)
+
+                logging.info(f"Update Database: {indicators_values}")
+                self.db_client.update_indicators(
+                    message["timestamp"], indicators_values
+                )
+
+                market_indicators = message
+                market_indicators["indicators"] = indicators_values
+                logging.info(f"Market Indicators => {market_indicators}")
+                self.kafka_client.publish_market_indicators(market_indicators)
             else:
                 logging.info("Waiting for messages...")
 
             await asyncio.sleep(1)
 
-    def calculate_indicators(self, message: dict) -> None:
+    def calculate_indicators(self, message: dict) -> dict:
         indicators_values = {}
 
         for indicator in self.indicators:
@@ -54,8 +65,7 @@ class TechnicalAnalysisUnit:
                 else:
                     indicators_values[str(indicator)] = indicator_result
 
-        logging.info(f"Update Database: {indicators_values}")
-        self.db_client.update_indicators(message["timestamp"], indicators_values)
+        return indicators_values
 
 
 async def main():
