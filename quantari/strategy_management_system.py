@@ -4,13 +4,14 @@ import signal
 
 from quantari.decorators import catch_and_set_exception
 from quantari.kafka_client import KafkaClient
+from quantari.strategies import SimpleMACD
 
 
 class StrategyManagementSystem:
     def __init__(self):
         self.kafka_client = KafkaClient()
         self.exception = False
-        self.strategies = []
+        self.strategies = [SimpleMACD()]
 
     def close(self) -> None:
         self.kafka_client.close()

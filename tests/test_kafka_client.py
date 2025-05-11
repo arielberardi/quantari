@@ -87,14 +87,11 @@ class TestKafkaClient:
         kafka_client.consumer.close.assert_called_once()
 
     def test_pull_data(self, kafka_client):
-        records = [SimpleNamespace(value="message1"), SimpleNamespace(value="message2")]
+        records = [SimpleNamespace(topic="topic_name", value="message1")]
         kafka_client.consumer.poll = MagicMock()
-        kafka_client.consumer.poll.return_value = {
-            "topic_name": records,
-        }
+        kafka_client.consumer.poll.return_value = {"topic_name": records}
 
         value = kafka_client.pull_data("topic_name")
-
         kafka_client.consumer.poll.assert_called_once()
         assert value is records[0].value
 
@@ -102,10 +99,8 @@ class TestKafkaClient:
         value = kafka_client.pull_data("topic_name")
         assert value is None
 
-        kafka_client.consumer.poll.return_value = {
-            "example_topic": records,
-        }
-        value = kafka_client.pull_data("topic_name")
+        kafka_client.consumer.poll.return_value = {"topic_name": records}
+        value = kafka_client.pull_data("example_topic")
         assert value is None
 
     def test_publish_signals(self, kafka_client):
@@ -120,11 +115,10 @@ class TestKafkaClient:
     def test_publish_market_indicators(self, kafka_client):
         market_indicators = self.MOCK_CANDLE_DATA.copy()
         market_indicators["indicators"] = "indicators"
-
-        kafka_client.publish_market_indicators(market_indicators)
-
         market_indicators.pop("interval_begin")
         market_indicators["timestamp"] = self.MOCK_CANDLE_DATA["interval_begin"]
+
+        kafka_client.publish_market_indicators(market_indicators)
 
         kafka_client.producer.send.assert_called_once_with(
             "market_indicators",
