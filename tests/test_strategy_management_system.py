@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from quantari.strategies import Signals
 from quantari.strategy_management_system import StrategyManagementSystem
 
 
@@ -21,11 +22,11 @@ class TestStrategyManagementSystem:
     @pytest.fixture
     def mock_strategies(self):
         mock1 = MagicMock()
-        mock1.evaluate = MagicMock(return_value=0)
+        mock1.evaluate = MagicMock(return_value=Signals.HOLD)
         mock1.__str__ = MagicMock(return_value="MockSignal1")
 
         mock2 = MagicMock()
-        mock2.evaluate = MagicMock(return_value=1)
+        mock2.evaluate = MagicMock(return_value=Signals.BUY)
         mock2.__str__ = MagicMock(return_value="MockSignal2")
 
         return [mock1, mock2]
@@ -76,7 +77,7 @@ class TestStrategyManagementSystem:
 
         # Publish data into Kafka
         strategy_management_system.kafka_client.publish_signals.assert_called_once_with(
-            {"Signal": 1}
+            {"Signal": Signals.BUY}
         )
 
     def test_evaluate_strategies(self, strategy_management_system, mock_strategies):
@@ -85,7 +86,7 @@ class TestStrategyManagementSystem:
         mock_message = {"close": 1.0, "timestamp": "2025-05-10T09:11:41.000Z"}
 
         signals = strategy_management_system.evaluate_strategies(mock_message)
-        assert signals == {"MockSignal1": 0, "MockSignal2": 1}
+        assert signals == {"MockSignal1": Signals.HOLD, "MockSignal2": Signals.BUY}
 
         # Evaluates all the strategies
         for strategy in mock_strategies:

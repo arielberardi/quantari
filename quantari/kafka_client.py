@@ -76,7 +76,7 @@ class KafkaClient:
 
         value = {
             "symbol": market_indicators["symbol"],
-            "timestamp": market_indicators["interval_begin"],
+            "timestamp": market_indicators["timestamp"],
             "open": market_indicators["open"],
             "high": market_indicators["high"],
             "low": market_indicators["low"],
@@ -101,10 +101,9 @@ class KafkaClient:
         logging.debug(f"Received data from Kafka: {package}")
 
         for topic, records in package.items():
-            if topic != topic_name:
-                continue
             for message in records:
-                return message.value
+                if message.topic == topic_name:
+                    return message.value
 
         return None
 

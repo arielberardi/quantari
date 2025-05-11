@@ -41,10 +41,9 @@ class TechnicalAnalysisUnit:
                     message["timestamp"], indicators_values
                 )
 
-                market_indicators = message
-                market_indicators["indicators"] = indicators_values
-                logging.info(f"Market Indicators => {market_indicators}")
-                self.kafka_client.publish_market_indicators(market_indicators)
+                message["indicators"] = indicators_values
+                logging.info(f"Market Indicators => {message}")
+                self.kafka_client.publish_market_indicators(message)
             else:
                 logging.info("Waiting for messages...")
 

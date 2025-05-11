@@ -120,11 +120,10 @@ class TestKafkaClient:
     def test_publish_market_indicators(self, kafka_client):
         market_indicators = self.MOCK_CANDLE_DATA.copy()
         market_indicators["indicators"] = "indicators"
-
-        kafka_client.publish_market_indicators(market_indicators)
-
         market_indicators.pop("interval_begin")
         market_indicators["timestamp"] = self.MOCK_CANDLE_DATA["interval_begin"]
+
+        kafka_client.publish_market_indicators(market_indicators)
 
         kafka_client.producer.send.assert_called_once_with(
             "market_indicators",
