@@ -1,4 +1,5 @@
 import os
+from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
@@ -23,11 +24,13 @@ class TestKafkaClient:
     def kafka_client(self):
         kc = KafkaClient()
         kc.producer = MagicMock()
+        kc.consumer = MagicMock()
         return kc
 
     def test_init(self):
         kc = KafkaClient()
         assert kc.producer is None
+        assert kc.consumer is None
 
     def test_delete(self, kafka_client):
         with patch.object(KafkaClient, "close_producer") as mock_close_producer:
@@ -65,4 +68,65 @@ class TestKafkaClient:
         kafka_client.producer.send.assert_called_once_with(
             "market_data",
             kafka_data,
+        )
+
+    def test_subscribe_to_market_data(self, kafka_client):
+        kafka_client.subscribe_market_data()
+        kafka_client.consumer.subscribe.assert_called_once_with(["market_data"])
+
+    def test_subscribe_to_market_indicators(self, kafka_client):
+        kafka_client.subscribe_market_indicators()
+        kafka_client.consumer.subscribe.assert_called_once_with(["market_indicators"])
+
+    def test_subscribe_to_signals(self, kafka_client):
+        kafka_client.subscribe_signals()
+        kafka_client.consumer.subscribe.assert_called_once_with(["signals"])
+
+    def test_close_consumer(self, kafka_client):
+        kafka_client.close_consumer()
+        kafka_client.consumer.close.assert_called_once()
+
+    def test_pull_data(self, kafka_client):
+        records = [SimpleNamespace(value="message1"), SimpleNamespace(value="message2")]
+        kafka_client.consumer.poll = MagicMock()
+        kafka_client.consumer.poll.return_value = {
+            "topic_name": records,
+        }
+
+        value = kafka_client.pull_data("topic_name")
+
+        kafka_client.consumer.poll.assert_called_once()
+        assert value is records[0].value
+
+        kafka_client.consumer.poll.return_value = {}
+        value = kafka_client.pull_data("topic_name")
+        assert value is None
+
+        kafka_client.consumer.poll.return_value = {
+            "example_topic": records,
+        }
+        value = kafka_client.pull_data("topic_name")
+        assert value is None
+
+    def test_publish_signals(self, kafka_client):
+        mock_signals = {"Signal1": "Hold", "Signal2": "Buy"}
+        kafka_client.publish_signals(mock_signals)
+
+        kafka_client.producer.send.assert_called_once_with(
+            "signals",
+            mock_signals,
+        )
+
+    def test_publish_market_indicators(self, kafka_client):
+        market_indicators = self.MOCK_CANDLE_DATA.copy()
+        market_indicators["indicators"] = "indicators"
+
+        kafka_client.publish_market_indicators(market_indicators)
+
+        market_indicators.pop("interval_begin")
+        market_indicators["timestamp"] = self.MOCK_CANDLE_DATA["interval_begin"]
+
+        kafka_client.producer.send.assert_called_once_with(
+            "market_indicators",
+            market_indicators,
         )

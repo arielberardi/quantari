@@ -11,7 +11,7 @@ class KafkaClient:
         self.consumer = None
 
     def __del__(self) -> None:
-        self.close_producer()
+        self.close()
 
     def create_producer(self) -> None:
         self.producer = KafkaProducer(
@@ -23,6 +23,10 @@ class KafkaClient:
             client_id="quantari-dpu-1",
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
         )
+
+    def close(self) -> None:
+        self.close_producer()
+        self.close_consumer()
 
     def close_producer(self) -> None:
         if self.producer:
@@ -38,8 +42,14 @@ class KafkaClient:
             value_deserializer=lambda m: json.loads(m.decode("utf-8")),
         )
 
-    def subscribe_market_data(self, topic) -> None:
-        self.consumer.subscribe([topic])
+    def subscribe_market_data(self) -> None:
+        self.consumer.subscribe(["market_data"])
+
+    def subscribe_market_indicators(self) -> None:
+        self.consumer.subscribe(["market_indicators"])
+
+    def subscribe_signals(self) -> None:
+        self.consumer.subscribe(["signals"])
 
     def close_consumer(self) -> None:
         if self.consumer:
@@ -61,7 +71,29 @@ class KafkaClient:
         self.producer.send("market_data", value)
         self.producer.flush()
 
-    def pull_market_data(self) -> dict | None:
+    def publish_market_indicators(self, market_indicators: dict) -> None:
+        logging.debug(f"Sending data to Kafka: {market_indicators}")
+
+        value = {
+            "symbol": market_indicators["symbol"],
+            "timestamp": market_indicators["interval_begin"],
+            "open": market_indicators["open"],
+            "high": market_indicators["high"],
+            "low": market_indicators["low"],
+            "close": market_indicators["close"],
+            "volume": market_indicators["volume"],
+            "indicators": market_indicators["indicators"],
+        }
+
+        self.producer.send("market_indicators", value)
+        self.producer.flush()
+
+    def publish_signals(self, signals: dict) -> None:
+        logging.debug(f"Sending data to Kafka: {signals}")
+        self.producer.send("signals", signals)
+        self.producer.flush()
+
+    def pull_data(self, topic_name) -> dict | None:
         package = self.consumer.poll(timeout_ms=1000)
         if len(package) == 0:
             return None
@@ -69,7 +101,18 @@ class KafkaClient:
         logging.debug(f"Received data from Kafka: {package}")
 
         for topic, records in package.items():
+            if topic != topic_name:
+                continue
             for message in records:
                 return message.value
 
         return None
+
+    def pull_market_data(self):
+        return self.pull_data("market_data")
+
+    def pull_market_indicators(self):
+        return self.pull_data("market_indicators")
+
+    def pull_signals(self):
+        return self.pull_data("signals")

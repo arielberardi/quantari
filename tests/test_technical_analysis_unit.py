@@ -36,20 +36,23 @@ class TestTechnicalAnalysisUnit:
 
     def test_close(self, technical_analysis_unit):
         technical_analysis_unit.close()
-        technical_analysis_unit.kafka_consumer.close_consumer.assert_called_once()
+        technical_analysis_unit.kafka_client.close.assert_called_once()
         technical_analysis_unit.db_client.close_connection.assert_called_once()
 
     @pytest.mark.asyncio
-    @patch.object(TechnicalAnalysisUnit, "calculate_indicators", autospec=True)
+    @patch.object(
+        TechnicalAnalysisUnit,
+        "calculate_indicators",
+        return_value={"Indicator": 1},
+        autospec=True,
+    )
     async def test_run_until_an_exception(
         self, mock_calculate_indicators, technical_analysis_unit
     ):
-        market_data = {"close": 1.0}
+        market_data = {"close": 1.0, "timestamp": "2025-05-10T09:11:41.000Z"}
 
         technical_analysis_unit.exception = False
-        technical_analysis_unit.kafka_consumer.pull_market_data.return_value = (
-            market_data
-        )
+        technical_analysis_unit.kafka_client.pull_market_data.return_value = market_data
 
         # Simulate the exception occurring after a short delay
         async def stop_after_delay():
@@ -66,22 +69,37 @@ class TestTechnicalAnalysisUnit:
         technical_analysis_unit.db_client.create_market_table.assert_called_once()
 
         # Setup Kafka producer
-        technical_analysis_unit.kafka_consumer.create_consumer.assert_called_once()
-        technical_analysis_unit.kafka_consumer.subscribe_market_data.assert_called_once()
+        technical_analysis_unit.kafka_client.create_consumer.assert_called_once()
+        technical_analysis_unit.kafka_client.create_producer.assert_called_once()
+        technical_analysis_unit.kafka_client.subscribe_market_data.assert_called_once()
 
         # Pull market data
-        technical_analysis_unit.kafka_consumer.pull_market_data.assert_called_once()
+        technical_analysis_unit.kafka_client.pull_market_data.assert_called_once()
 
         # Calculate indicators with recevied message
         mock_calculate_indicators.assert_called_once_with(
             technical_analysis_unit, market_data
         )
 
+        technical_analysis_unit.db_client.update_indicators.assert_called_once_with(
+            market_data["timestamp"], {"Indicator": 1}
+        )
+
+        market_indicators = market_data
+        market_indicators["indicators"] = {"Indicators": 1}
+
+        technical_analysis_unit.kafka_client.publish_market_indicators.assert_called_once_with(
+            market_indicators
+        )
+
     def test_calculate_indicators(self, technical_analysis_unit, mock_indicators):
         technical_analysis_unit.indicators = mock_indicators
 
         mock_message = {"close": 1.0, "timestamp": "2025-05-10T09:11:41.000Z"}
-        technical_analysis_unit.calculate_indicators(mock_message)
+        indicators = technical_analysis_unit.calculate_indicators(mock_message)
+
+        expected = {"MockIndicator": 1.0, "MockIndicator2": 2.0}
+        assert indicators == expected
 
         # Calculate values for all indicators
         for indicator in mock_indicators:
