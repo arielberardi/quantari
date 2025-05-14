@@ -1,3 +1,4 @@
+# TODO: Similar to SMA we should keep the window internally in memory and pop older values
 class EMA:
     def __init__(self, period: int = 50, name: str = None):
         self.period = period

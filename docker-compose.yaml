@@ -19,7 +19,7 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:${KAFKA_PORT}
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:${KAFKA_PORT}
       KAFKA_LISTENERS: PLAINTEXT://kafka:${KAFKA_PORT},CONTROLLER://kafka:9093
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
@@ -32,3 +32,55 @@ services:
       - "${KAFKA_PORT}:9092"
     volumes:
       - ./tmp/kafka-data:/tmp/kraft-combined-logs
+
+  data_processor_unit:
+    build: .
+    container_name: data_processor_unit
+    working_dir: /app
+    volumes:
+      - ./quantari:/app/quantari
+      - ./.env:/app/.env
+    depends_on:
+      - timescaledb
+      - kafka
+    command: >
+      sh -c "poetry run python -m quantari.data_processor_unit"
+
+  technical_analysis_unit:
+    build: .
+    container_name: technical_analysis_unit
+    working_dir: /app
+    volumes:
+      - ./quantari:/app/quantari
+      - ./.env:/app/.env
+    depends_on:
+      - timescaledb
+      - kafka
+    command: >
+      sh -c "poetry run python -m quantari.technical_analysis_unit"
+
+  strategy_management_system:
+    build: .
+    container_name: strategy_management_system
+    working_dir: /app
+    volumes:
+      - ./quantari:/app/quantari
+      - ./.env:/app/.env
+    depends_on:
+      - timescaledb
+      - kafka
+    command: >
+      sh -c "poetry run python -m quantari.strategy_management_system"
+
+  order_management_system:
+    build: .
+    container_name: order_management_system
+    working_dir: /app
+    volumes:
+      - ./quantari:/app/quantari
+      - ./.env:/app/.env
+    depends_on:
+      - timescaledb
+      - kafka
+    command: >
+      sh -c "trap : TERM INT; tail -f /dev/null & wait"
